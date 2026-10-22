@@ -1448,7 +1448,7 @@ describe('#3532 shadowed global-defaults warning', () => {
   test('agent_skills: __proto__ key on the project side is dropped, no pollution or inheritance', () => {
     fs.writeFileSync(
       path.join(tmpDir, '.planning', 'config.json'),
-      '{"agent_skills": {"__proto__": {"gsd-planner": ["global:evil"]}, "gsd-executor": ["global:proj"]}}',
+      '{"agent_skills": {"__proto__": {"gsd-planner": ["global:evil"]}, "constructor": ["x"], "prototype": ["y"], "gsd-executor": ["global:proj"]}}',
     );
     writeGlobalDefaults({ agent_skills: { 'gsd-executor': ['global:foo'] } });
     const cfg = loadConfigResolved(tmpDir).config;
