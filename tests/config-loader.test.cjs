@@ -1428,6 +1428,36 @@ describe('#3532 shadowed global-defaults warning', () => {
     assert.deepEqual(cfg.agent_skills['gsd-executor'], []);
   });
 
+  test('agent_skills: project config with the key truly absent inherits the global value', () => {
+    writeConfig(tmpDir, { model_profile: 'balanced' });
+    writeGlobalDefaults({ agent_skills: { 'gsd-executor': ['global:foo'] } });
+    const cfg = loadConfigResolved(tmpDir).config;
+    assert.deepEqual(cfg.agent_skills, { 'gsd-executor': ['global:foo'] });
+  });
+
+  for (const [label, bad] of [['string', 'abc'], ['array', ['x', 'y']], ['number', 5]]) {
+    test(`agent_skills: malformed project value (${label}) is not spread, global is inherited`, () => {
+      writeConfig(tmpDir, { agent_skills: bad });
+      writeGlobalDefaults({ agent_skills: { 'gsd-executor': ['global:foo'] } });
+      const cfg = loadConfigResolved(tmpDir).config;
+      assert.deepEqual(cfg.agent_skills, { 'gsd-executor': ['global:foo'] });
+      assert.ok(stderrLines.some(l => l.includes('project agent_skills is not an object')), stderrLines.join(''));
+    });
+  }
+
+  test('agent_skills: __proto__ key on the project side is dropped, no pollution or inheritance', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      '{"agent_skills": {"__proto__": {"gsd-planner": ["global:evil"]}, "gsd-executor": ["global:proj"]}}',
+    );
+    writeGlobalDefaults({ agent_skills: { 'gsd-executor': ['global:foo'] } });
+    const cfg = loadConfigResolved(tmpDir).config;
+    assert.equal(Object.getPrototypeOf(cfg.agent_skills), Object.prototype);
+    assert.equal(cfg.agent_skills['gsd-planner'], undefined);
+    assert.equal({}['gsd-planner'], undefined);
+    assert.deepEqual(cfg.agent_skills, { 'gsd-executor': ['global:proj'] });
+  });
+
   test('agent_skills: no global file leaves the project value unchanged', () => {
     writeConfig(tmpDir, { agent_skills: { 'gsd-executor': ['global:proj'] } });
     const cfg = loadConfigResolved(tmpDir).config;

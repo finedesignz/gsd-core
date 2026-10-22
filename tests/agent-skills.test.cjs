@@ -1879,7 +1879,7 @@ describe('#1400 regression: plain agent-skills output survives pipe/file stdout'
         [TOOLS_PATH, 'query', 'agent-skills', agentType],
         {
           cwd: tmpDir,
-          env: { ...process.env, ...TEST_ENV_BASE, HOME: tmpDir, USERPROFILE: tmpDir },
+          env: { ...process.env, ...TEST_ENV_BASE, HOME: tmpDir, USERPROFILE: tmpDir, GSD_HOME: tmpDir },
           stdio: ['ignore', fd, 'pipe'],
           timeout: PROBE_TIMEOUT_MS,
         },
@@ -1943,7 +1943,7 @@ describe('#1400 regression: plain agent-skills output survives pipe/file stdout'
     // spawnSync maxBuffer default, so no override is needed.
     const result = runNode([TOOLS_PATH, 'query', 'agent-skills', 'gsd-executor'], {
       cwd: tmpDir,
-      env: { ...process.env, ...TEST_ENV_BASE, HOME: tmpDir, USERPROFILE: tmpDir },
+      env: { ...process.env, ...TEST_ENV_BASE, HOME: tmpDir, USERPROFILE: tmpDir, GSD_HOME: tmpDir },
       timeoutMs: PROBE_TIMEOUT_MS,
     });
     const out = result.stdout || '';

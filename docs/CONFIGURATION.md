@@ -2310,7 +2310,10 @@ Two different rules apply, and the difference is deliberate ([#3532](https://git
 - **`agent_skills` is the other exception**: it resolves per agent. A project that defines an
   agent key (for example `agent_skills.gsd-executor`) uses its own value, an explicit `[]` opts
   that agent out, and any agent the project does not define inherits the value from the global
-  file. It does not trigger the warning.
+  file. So a project with `agent_skills: {}` or a partial map inherits the global entries for
+  every agent it does not define; only a per-agent `[]` opts out. A malformed project
+  `agent_skills` (string, array, number) is ignored with a warning. It does not trigger the
+  shadowed-key warning.
 - **The whole `git.*` namespace is project-scoped and never resolves from the global file**,
   in either directory shape — not `git.base_branch`, not `git.protected_branches`, not
   `git.allow_default_branch_commits`, not

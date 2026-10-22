@@ -1002,13 +1002,21 @@ function loadConfigResolved(cwd: string, options: Record<string, unknown> = {}):
         // GLOBAL_DEFAULTS_RESOLUTION_KEYS so it no longer warns as ignored.
         const globalSkills = shadowRead.data['agent_skills'];
         if (globalSkills && typeof globalSkills === 'object' && !Array.isArray(globalSkills)) {
-          const projectSkills = _baseConfig['agent_skills'] as Record<string, unknown>;
-          const merged: Record<string, unknown> = {};
-          for (const [agent, skills] of Object.entries(globalSkills)) {
-            if (agent === '__proto__' || agent === 'constructor' || agent === 'prototype') continue;
-            merged[agent] = skills;
+          const projectSkills = _baseConfig['agent_skills'];
+          const projectIsMap = !!projectSkills && typeof projectSkills === 'object' && !Array.isArray(projectSkills);
+          if (!projectIsMap) {
+            process.stderr.write('[config] WARNING: project agent_skills is not an object - ignoring it and using global agent_skills\n');
           }
-          _baseConfig['agent_skills'] = Object.assign(merged, projectSkills);
+          const copySafe = (src: object, dest: Record<string, unknown>): void => {
+            for (const [agent, skills] of Object.entries(src)) {
+              if (agent === '__proto__' || agent === 'constructor' || agent === 'prototype') continue;
+              dest[agent] = skills;
+            }
+          };
+          const merged: Record<string, unknown> = {};
+          copySafe(globalSkills, merged);
+          if (projectIsMap) copySafe(projectSkills as object, merged);
+          _baseConfig['agent_skills'] = merged;
         }
       }
     } catch {
