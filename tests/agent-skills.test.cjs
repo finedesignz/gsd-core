@@ -43,7 +43,7 @@ const { loadTrustedGlobalRoots, tryWithinRoot, PathAcceptance } = require('../gs
 // TEST_ENV_BASE blanks GSD_HOME (so it resolves to the real homedir). Point every
 // spawn at an empty GSD_HOME so a developer's own global defaults cannot leak in.
 const ISOLATED_GSD_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-agent-skills-home-'));
-process.on('exit', () => { try { fs.rmSync(ISOLATED_GSD_HOME, { recursive: true, force: true }); } catch { /* best effort */ } });
+process.on('exit', () => { cleanup(ISOLATED_GSD_HOME); });
 
 function writeConfig(tmpDir, obj) {
   const configPath = path.join(tmpDir, '.planning', 'config.json');

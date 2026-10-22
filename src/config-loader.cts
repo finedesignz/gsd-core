@@ -1015,7 +1015,7 @@ function loadConfigResolved(cwd: string, options: Record<string, unknown> = {}):
           };
           const merged: Record<string, unknown> = {};
           copySafe(globalSkills, merged);
-          if (projectIsMap) copySafe(projectSkills as object, merged);
+          if (projectIsMap) copySafe(projectSkills, merged);
           _baseConfig['agent_skills'] = merged;
         }
       }

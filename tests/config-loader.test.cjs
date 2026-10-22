@@ -36,7 +36,7 @@ const { loadConfig, loadConfigResolved, _resetRuntimeWarningCacheForTests, _deep
 // every test to an empty GSD_HOME; suites that need one set their own.
 const ISOLATED_GSD_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-cfg-loader-home-'));
 process.env.GSD_HOME = ISOLATED_GSD_HOME;
-process.on('exit', () => { try { fs.rmSync(ISOLATED_GSD_HOME, { recursive: true, force: true }); } catch { /* best effort */ } });
+process.on('exit', () => { cleanup(ISOLATED_GSD_HOME); });
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
