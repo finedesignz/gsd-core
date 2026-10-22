@@ -31,6 +31,13 @@ const configLoader = require('../gsd-core/bin/lib/config-loader.cjs');
 
 const { loadConfig, loadConfigResolved, _resetRuntimeWarningCacheForTests, _deepMergeConfig } = configLoader;
 
+// A project config now inherits agent_skills from ~/.gsd/defaults.json per agent,
+// so a developer's own global defaults would leak into these assertions. Default
+// every test to an empty GSD_HOME; suites that need one set their own.
+const ISOLATED_GSD_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-cfg-loader-home-'));
+process.env.GSD_HOME = ISOLATED_GSD_HOME;
+process.on('exit', () => { try { fs.rmSync(ISOLATED_GSD_HOME, { recursive: true, force: true }); } catch { /* best effort */ } });
+
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 function makeTempProject(prefix = 'gsd-cfg-loader-test-') {
@@ -1327,13 +1334,15 @@ describe('#2997: phase_id_convention is not silently dropped on a clean read', (
 // the global file is never opened, so each of these set globally is silently
 // inert. `effort` is deliberately absent: the install-time effort sync
 // (readGsdEffectiveEffortConfig) DOES merge the global file, so warning on it
-// would be false for the channel users control via effort sync.
+// would be false for the channel users control via effort sync. `agent_skills`
+// is likewise absent: it is merged per agent under a project config (see the
+// agent_skills global fallback describe below), not ignored.
 const GLOBAL_KEYS_SHADOWED_UNDER_PROJECT = [
   'model_profile', 'commit_docs', 'research', 'plan_checker', 'verifier',
   'nyquist_validation', 'post_planning_gaps', 'research_before_questions', 'parallelization', 'text_mode',
   'resolve_model_ids', 'context_window', 'subagent_timeout', 'model_overrides',
   'models', 'granularity', 'granularities', 'planning', 'dynamic_routing',
-  'fast_mode', 'agent_skills', 'response_language', 'runtime',
+  'fast_mode', 'response_language', 'runtime',
   'model_profile_overrides', 'model_policy',
 ];
 
@@ -1395,6 +1404,34 @@ describe('#3532 shadowed global-defaults warning', () => {
     loadConfigResolved(tmpDir);
     assert.equal(stderrLines.filter(l => l.includes('defaults.json')).length, 0,
       `effort must not trigger the shadow warning: ${stderrLines.join('')}`);
+  });
+
+  test('agent_skills: project without the key inherits the global value, no warning', () => {
+    writeConfig(tmpDir, { model_profile: 'balanced', agent_skills: {} });
+    writeGlobalDefaults({ agent_skills: { 'gsd-executor': ['global:foo'] } });
+    const cfg = loadConfigResolved(tmpDir).config;
+    assert.deepEqual(cfg.agent_skills, { 'gsd-executor': ['global:foo'] });
+    assert.equal(stderrLines.filter(l => l.includes('defaults.json')).length, 0, stderrLines.join(''));
+  });
+
+  test('agent_skills: project key overrides the global value for that agent only', () => {
+    writeConfig(tmpDir, { agent_skills: { 'gsd-executor': ['global:proj'] } });
+    writeGlobalDefaults({ agent_skills: { 'gsd-executor': ['global:foo'], 'gsd-planner': ['global:bar'] } });
+    const cfg = loadConfigResolved(tmpDir).config;
+    assert.deepEqual(cfg.agent_skills, { 'gsd-executor': ['global:proj'], 'gsd-planner': ['global:bar'] });
+  });
+
+  test('agent_skills: explicit empty array in the project opts that agent out', () => {
+    writeConfig(tmpDir, { agent_skills: { 'gsd-executor': [] } });
+    writeGlobalDefaults({ agent_skills: { 'gsd-executor': ['global:foo'] } });
+    const cfg = loadConfigResolved(tmpDir).config;
+    assert.deepEqual(cfg.agent_skills['gsd-executor'], []);
+  });
+
+  test('agent_skills: no global file leaves the project value unchanged', () => {
+    writeConfig(tmpDir, { agent_skills: { 'gsd-executor': ['global:proj'] } });
+    const cfg = loadConfigResolved(tmpDir).config;
+    assert.deepEqual(cfg.agent_skills, { 'gsd-executor': ['global:proj'] });
   });
 
   test('absent global defaults never warn', () => {
