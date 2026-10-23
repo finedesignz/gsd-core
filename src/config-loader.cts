@@ -372,7 +372,7 @@ const GLOBAL_DEFAULTS_RESOLUTION_KEYS = [
   'nyquist_validation', 'post_planning_gaps', 'research_before_questions', 'parallelization', 'text_mode',
   'resolve_model_ids', 'context_window', 'subagent_timeout', 'model_overrides',
   'models', 'granularity', 'granularities', 'planning', 'dynamic_routing',
-  'effort', 'fast_mode', 'agent_skills', 'response_language', 'runtime',
+  'effort', 'fast_mode', 'response_language', 'runtime',
   'model_profile_overrides', 'model_policy',
 ];
 
@@ -996,6 +996,28 @@ function loadConfigResolved(cwd: string, options: Record<string, unknown> = {}):
       const shadowRead = _readConfigFile(shadowPath);
       if (shadowRead.kind === 'ok') {
         _warnShadowedGlobalDefaults(shadowRead.data, shadowPath);
+        // agent_skills is the one global key that is NOT shadowed: resolve it
+        // per agent — the project's value when it defines that agent key (an
+        // explicit [] still opts out), else the global default. Excluded from
+        // GLOBAL_DEFAULTS_RESOLUTION_KEYS so it no longer warns as ignored.
+        const globalSkills = shadowRead.data['agent_skills'];
+        if (globalSkills && typeof globalSkills === 'object' && !Array.isArray(globalSkills)) {
+          const projectSkills = _baseConfig['agent_skills'];
+          const projectIsMap = !!projectSkills && typeof projectSkills === 'object' && !Array.isArray(projectSkills);
+          if (!projectIsMap) {
+            process.stderr.write('[config] WARNING: project agent_skills is not an object - ignoring it and using global agent_skills\n');
+          }
+          const copySafe = (src: object, dest: Record<string, unknown>): void => {
+            for (const [agent, skills] of Object.entries(src)) {
+              if (agent === '__proto__' || agent === 'constructor' || agent === 'prototype') continue;
+              dest[agent] = skills;
+            }
+          };
+          const merged: Record<string, unknown> = {};
+          copySafe(globalSkills, merged);
+          if (projectIsMap) copySafe(projectSkills, merged);
+          _baseConfig['agent_skills'] = merged;
+        }
       }
     } catch {
       // Observation only — never let the diagnostic perturb resolution.

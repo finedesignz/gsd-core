@@ -25,7 +25,7 @@ const { PROBE_TIMEOUT_MS } = require('./helpers/timeouts.cjs');
  * Returns { success, stdout, stderr }.
  */
 function runGsdToolsWithStderr(args, cwd, env) {
-  const childEnv = { ...process.env, ...TEST_ENV_BASE, ...(env || {}) };
+  const childEnv = { ...process.env, ...TEST_ENV_BASE, GSD_HOME: ISOLATED_GSD_HOME, ...(env || {}) };
   const result = runNode([TOOLS_PATH, ...args], { cwd, env: childEnv, timeoutMs: PROBE_TIMEOUT_MS });
   return {
     success: result.exitCode === 0,
@@ -38,6 +38,12 @@ function runGsdToolsWithStderr(args, cwd, env) {
 const { loadTrustedGlobalRoots, tryWithinRoot, PathAcceptance } = require('../gsd-core/bin/lib/security.cjs');
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
+
+// Project agent_skills now falls back to ~/.gsd/defaults.json per agent, and
+// TEST_ENV_BASE blanks GSD_HOME (so it resolves to the real homedir). Point every
+// spawn at an empty GSD_HOME so a developer's own global defaults cannot leak in.
+const ISOLATED_GSD_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-agent-skills-home-'));
+process.on('exit', () => { cleanup(ISOLATED_GSD_HOME); });
 
 function writeConfig(tmpDir, obj) {
   const configPath = path.join(tmpDir, '.planning', 'config.json');
@@ -65,7 +71,7 @@ function runAgentSkillsJson(args, tmpDir, env) {
   if (cmdIdx !== -1) {
     withJson.splice(cmdIdx + 1, 0, '--json');
   }
-  const result = runGsdTools(withJson, tmpDir, env || { HOME: tmpDir, USERPROFILE: tmpDir });
+  const result = runGsdTools(withJson, tmpDir, { GSD_HOME: ISOLATED_GSD_HOME, ...(env || { HOME: tmpDir, USERPROFILE: tmpDir }) });
   if (!result.success) return { success: false, error: result.error, ir: null };
   try {
     return { success: true, ir: JSON.parse(result.output) };
@@ -1873,7 +1879,7 @@ describe('#1400 regression: plain agent-skills output survives pipe/file stdout'
         [TOOLS_PATH, 'query', 'agent-skills', agentType],
         {
           cwd: tmpDir,
-          env: { ...process.env, ...TEST_ENV_BASE, HOME: tmpDir, USERPROFILE: tmpDir },
+          env: { ...process.env, ...TEST_ENV_BASE, HOME: tmpDir, USERPROFILE: tmpDir, GSD_HOME: tmpDir },
           stdio: ['ignore', fd, 'pipe'],
           timeout: PROBE_TIMEOUT_MS,
         },
@@ -1937,7 +1943,7 @@ describe('#1400 regression: plain agent-skills output survives pipe/file stdout'
     // spawnSync maxBuffer default, so no override is needed.
     const result = runNode([TOOLS_PATH, 'query', 'agent-skills', 'gsd-executor'], {
       cwd: tmpDir,
-      env: { ...process.env, ...TEST_ENV_BASE, HOME: tmpDir, USERPROFILE: tmpDir },
+      env: { ...process.env, ...TEST_ENV_BASE, HOME: tmpDir, USERPROFILE: tmpDir, GSD_HOME: tmpDir },
       timeoutMs: PROBE_TIMEOUT_MS,
     });
     const out = result.stdout || '';
